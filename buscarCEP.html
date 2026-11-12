@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>buscaCEP</title>
+  <style>
+    :root {
+      --borda: #888;
+      --vermelho: #e00000;
+      --cinza: #efefef;
+    }
+    body {
+      font-family: "Times New Roman", Times, serif;
+      margin: 20px;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 16px; }
+    .campo {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 14px;
+      padding: 8px;
+      font: 0.85rem Arial, Helvetica, sans-serif;
+      border: 1px solid var(--borda);
+      border-radius: 3px;
+    }
+    button.campo { background: var(--cinza); cursor: pointer; }
+    button.campo:hover { background: #e0e0e0; }
+    button.campo:disabled { opacity: .6; cursor: not-allowed; }
+    #resultado p { margin: 6px 0; }
+    .erro {
+      display: inline-block;
+      padding: 2px 4px;
+      border: 2px solid var(--vermelho);
+    }
+  </style>
+</head>
+<body>
+  <h1>buscaCEP</h1>
+
+  <input id="cep" class="campo" type="text" placeholder="Digite o CEP (ex: 01001000)" maxlength="9" autocomplete="off">
+  <button id="btnBuscar" class="campo">Buscar Endereço</button>
+
+  <div id="resultado"></div>
+
+  <script>
+    const campoCep = document.querySelector('#cep');
+    const botao = document.querySelector('#btnBuscar');
+    const saida = document.querySelector('#resultado');
+
+    const HTML_ERRO = '<span class="erro">Erro ao buscar endereço.</span>';
+
+    function esc(texto) {
+      return String(texto ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function montarEndereco({ logradouro, bairro, localidade, uf }) {
+      return `
+        <p><strong>Logradouro:</strong> ${esc(logradouro)}</p>
+        <p><strong>Bairro:</strong> ${esc(bairro)}</p>
+        <p><strong>Cidade:</strong> ${esc(localidade)}</p>
+        <p><strong>Estado:</strong> ${esc(uf)}</p>
+      `;
+    }
+
+    function buscar() {
+      const digitado = campoCep.value.trim();
+
+      
+      if (!/^\d{5}-?\d{3}$/.test(digitado)) {
+        saida.innerHTML = HTML_ERRO;
+        return;
+      }
+
+      const cep = digitado.replace('-', '');
+      botao.disabled = true;
+      saida.textContent = 'Buscando...';
+
+      fetch(`https://viacep.com.br/ws/${cep}/json/`)
+        .then((resp) => {
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          return resp.json();
+        })
+        .then((dados) => {
+          if (dados.erro) throw new Error('CEP inexistente');
+          saida.innerHTML = montarEndereco(dados);
+        })
+        .catch(() => {
+          saida.innerHTML = HTML_ERRO;
+        })
+        .finally(() => {
+          botao.disabled = false;
+        });
+    }
+
+    botao.addEventListener('click', buscar);
+    campoCep.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') buscar();
+    });
+  </script>
+</body>
+</html>
