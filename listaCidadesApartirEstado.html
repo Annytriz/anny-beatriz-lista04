@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>listaCidadesAPartirDeEstados</title>
+  <style>
+    :root {
+      --borda: #888;
+      --vermelho: #e00000;
+    }
+    body {
+      font-family: "Times New Roman", Times, serif;
+      margin: 20px;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 20px; }
+    label { display: block; margin-bottom: 6px; }
+    select {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 16px;
+      padding: 10px;
+      font: 0.9rem Arial, Helvetica, sans-serif;
+      background: #fff;
+      border: 1px solid var(--borda);
+      border-radius: 6px;
+    }
+    select:disabled { background: #f0f0f0; cursor: not-allowed; }
+    #mensagem { margin-top: 8px; }
+    .erro {
+      display: inline-block;
+      padding: 2px 4px;
+      border: 2px solid var(--vermelho);
+    }
+  </style>
+</head>
+<body>
+  <h1>listaCidadesAPartirDeEstados</h1>
+
+  <label for="estado">Estado:</label>
+  <select id="estado"><option value="">Carregando estados...</option></select>
+
+  <label for="cidade">Cidade:</label>
+  <select id="cidade" disabled><option value="">Selecione um estado primeiro</option></select>
+
+  <div id="mensagem"></div>
+
+  <script>
+    const BASE = 'https://servicodados.ibge.gov.br/api/v1/localidades/estados';
+
+    const $ = (id) => document.getElementById(id);
+    const selEstado = $('estado');
+    const selCidade = $('cidade');
+    const msg = $('mensagem');
+
+    const esc = (t) => String(t)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    async function getJSON(url) {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    }
+
+    function porNome(lista) {
+      return [...lista].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    }
+
+   
+    function preencher(select, itens, textoPadrao, campoValor) {
+      const opcoes = itens
+        .map((it) => `<option value="${esc(it[campoValor])}">${esc(it.nome)}</option>`)
+        .join('');
+      select.innerHTML = `<option value="">${textoPadrao}</option>${opcoes}`;
+    }
+
+    function erro(texto) {
+      msg.innerHTML = `<span class="erro">${texto}</span>`;
+    }
+
+    function resetarCidades() {
+      selCidade.innerHTML = '<option value="">Selecione um estado primeiro</option>';
+      selCidade.disabled = true;
+    }
+
+    async function iniciar() {
+      try {
+        const estados = await getJSON(BASE);
+        preencher(selEstado, porNome(estados), 'Selecione um estado', 'sigla');
+      } catch {
+        selEstado.innerHTML = '<option value="">Erro ao carregar</option>';
+        erro('Erro ao carregar os estados.');
+      }
+    }
+
+    selEstado.addEventListener('change', async () => {
+      msg.textContent = '';
+      const uf = selEstado.value;
+
+      if (!uf) {
+        resetarCidades();
+        return;
+      }
+
+      selCidade.disabled = true;
+      selCidade.innerHTML = '<option value="">Carregando cidades...</option>';
+
+      try {
+        const cidades = await getJSON(`${BASE}/${uf}/municipios`);
+        preencher(selCidade, porNome(cidades), 'Selecione uma cidade', 'nome');
+        selCidade.disabled = false;
+      } catch {
+        selCidade.innerHTML = '<option value="">Erro ao carregar</option>';
+        erro('Erro ao carregar as cidades.');
+      }
+    });
+
+    selCidade.addEventListener('change', () => {
+      const cidade = selCidade.value;
+      const nomeEstado = selEstado.selectedOptions[0]?.textContent;
+
+      msg.textContent = cidade && selEstado.value
+        ? `Você selecionou: ${cidade} - ${nomeEstado}`
+        : '';
+    });
+
+    iniciar();
+  </script>
+</body>
+</html>
