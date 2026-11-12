@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>detalhaPostagem</title>
+  <style>
+    :root {
+      --borda: #888;
+      --vermelho: #e00000;
+    }
+    body {
+      font-family: "Times New Roman", Times, serif;
+      margin: 20px;
+    }
+    h1 { font-size: 1.5rem; margin: 0 0 16px; }
+    label { display: block; margin-bottom: 6px; }
+    select {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+      padding: 8px;
+      font: 0.85rem Arial, Helvetica, sans-serif;
+      background: #fff;
+      border: 1px solid var(--borda);
+      border-radius: 6px;
+    }
+    .post-item {
+      padding: 2px 4px;
+      font-size: 0.9rem;
+      background: #e4e4e4;
+      border: 1px solid #aaa;
+      cursor: pointer;
+    }
+    .post-item:hover { background: #d4d4d4; }
+    .post-item.ativo { background: #c8d8f0; }
+    #detalhe { margin-top: 24px; }
+    #detalhe h2 { font-size: 1.1rem; margin: 0 0 8px; }
+    #detalhe p { margin: 0 0 16px; }
+    #detalhe ul { padding-left: 24px; }
+    #detalhe li { margin-bottom: 10px; font-size: 0.9rem; }
+    .erro {
+      display: inline-block;
+      padding: 2px 4px;
+      border: 2px solid var(--vermelho);
+    }
+  </style>
+</head>
+<body>
+  <h1>detalhaPostagem</h1>
+
+  <label for="usuario">Usuário:</label>
+  <select id="usuario"><option value="">Carregando usuários...</option></select>
+
+  <div id="postagens"></div>
+  <div id="detalhe"></div>
+
+  <script>
+    const API = 'https://jsonplaceholder.typicode.com';
+
+    const selUsuario = document.getElementById('usuario');
+    const listaPosts = document.getElementById('postagens');
+    const detalhe = document.getElementById('detalhe');
+
+    const esc = (t) => String(t)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const htmlErro = (texto) => `<span class="erro">${texto}</span>`;
+
+    async function getJSON(caminho) {
+      const resp = await fetch(API + caminho);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    }
+
+    async function carregarUsuarios() {
+      try {
+        const usuarios = await getJSON('/users');
+        selUsuario.innerHTML =
+          '<option value="">Selecione um usuário</option>' +
+          usuarios.map((u) => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+      } catch {
+        selUsuario.innerHTML = '<option value="">Erro ao carregar</option>';
+        listaPosts.innerHTML = htmlErro('Erro ao carregar os usuários.');
+      }
+    }
+
+    async function carregarPostagens(userId) {
+      listaPosts.textContent = 'Carregando postagens...';
+
+      try {
+        const posts = await getJSON(`/posts?userId=${userId}`);
+
+        listaPosts.innerHTML = posts.length
+          ? posts.map((p) => `<div class="post-item" data-id="${p.id}">${esc(p.title)}</div>`).join('')
+          : 'Este usuário não possui postagens.';
+      } catch {
+        listaPosts.innerHTML = htmlErro('Erro ao carregar as postagens.');
+      }
+    }
+
+    async function mostrarDetalhe(postId) {
+      detalhe.textContent = 'Carregando postagem...';
+
+      try {
+        const [post, comentarios] = await Promise.all([
+          getJSON(`/posts/${postId}`),
+          getJSON(`/posts/${postId}/comments`)
+        ]);
+
+        const itens = comentarios
+          .map((c) => `<li><strong>${esc(c.name)}</strong> (${esc(c.email)}): ${esc(c.body)}</li>`)
+          .join('');
+
+        detalhe.innerHTML = `
+          <h2>${esc(post.title)}</h2>
+          <p>${esc(post.body)}</p>
+          <strong>Comentários:</strong>
+          <ul>${itens}</ul>
+        `;
+      } catch {
+        detalhe.innerHTML = htmlErro('Erro ao carregar a postagem e os comentários.');
+      }
+    }
+
+    
+    listaPosts.addEventListener('click', (ev) => {
+      const item = ev.target.closest('.post-item');
+      if (!item) return;
+
+      listaPosts.querySelector('.ativo')?.classList.remove('ativo');
+      item.classList.add('ativo');
+      mostrarDetalhe(item.dataset.id);
+    });
+
+    selUsuario.addEventListener('change', () => {
+      detalhe.innerHTML = '';
+      const id = selUsuario.value;
+
+      if (id) {
+        carregarPostagens(id);
+      } else {
+        listaPosts.innerHTML = '';
+      }
+    });
+
+    carregarUsuarios();
+  </script>
+</body>
+</html>
